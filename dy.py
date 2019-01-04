@@ -75,7 +75,8 @@ class DyNetModel(object):
         target_encoding = dynet.concatenate_cols(target_encoding)
 
         affinities = dynet.transpose(target_encoding) * source_encoding
-        context = affinities * dynet.transpose(source_encoding)
+        attention = dynet.softmax(dynet.transpose(affinities))
+        context = dynet.transpose(source_encoding * attention)
 
         projection = self.calculate_projection(target_encoding, context)
         scores = self.calculate_output_scores(projection)
