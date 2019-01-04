@@ -13,7 +13,7 @@ class DyNetModel(object):
                  vocab_size: int,
                  embed_size: int,
                  hidden_size: int) -> None:
-        self.embeddings = pc.add_lookup_parameters((vocab_size, embed_size), dynet.UniformInitializer(0.1))
+        self.embeddings = pc.add_lookup_parameters((vocab_size, embed_size), dynet.UniformInitializer(0.1), name='embedding.weight')
         self.encoder = dynet.BiRNNBuilder(num_layers=1,
                                           input_dim=embed_size,
                                           hidden_dim=hidden_size,
@@ -23,10 +23,10 @@ class DyNetModel(object):
                                               input_dim=embed_size,
                                               hidden_dim=hidden_size,
                                               model=pc)
-        self.projection_layer_weights = pc.add_parameters((hidden_size, hidden_size * 2), dynet.UniformInitializer(0.1))
-        self.projection_layer_bias = pc.add_parameters((hidden_size), dynet.UniformInitializer(0.1))
-        self.output_layer_weights = pc.add_parameters((vocab_size, hidden_size), dynet.UniformInitializer(0.1))
-        self.output_layer_bias = pc.add_parameters((vocab_size), dynet.UniformInitializer(0.1))
+        self.projection_layer_weights = pc.add_parameters((hidden_size, hidden_size * 2), dynet.UniformInitializer(0.1), name='projection.weight')
+        self.projection_layer_bias = pc.add_parameters((hidden_size), dynet.UniformInitializer(0.1), name='projection.bias')
+        self.output_layer_weights = pc.add_parameters((vocab_size, hidden_size), dynet.UniformInitializer(0.1), name='output.weight')
+        self.output_layer_bias = pc.add_parameters((vocab_size), dynet.UniformInitializer(0.1), name='output.bias')
 
         for params in self.encoder.param_collection().parameters_list():
             params.set_value(np.random.uniform(-0.1, 0.1, params.shape()))
@@ -52,8 +52,8 @@ class DyNetModel(object):
                        scores: List[Expression]) -> Expression:
         losses = []
         for score, token in zip(scores, target_tokens):
-            probs = dynet.softmax(score)
-            losses.append(-dynet.log(probs[token]))
+            log_probs = dynet.log_softmax(score)
+            losses.append(-log_probs[token])
         return dynet.esum(losses)
 
     def __call__(self,
@@ -84,6 +84,13 @@ class DyNetModel(object):
         scores = scores[:-1]
 
         return self.calculate_loss(target_tokens, scores)
+
+
+def print_param_info(pc: ParameterCollection) -> None:
+    for param in pc.lookup_parameters_list() + pc.parameters_list():
+        norm = np.linalg.norm(param.as_array())
+        grad_norm = np.linalg.norm(param.grad_as_array())
+        print(f'{param.name()}\t{norm}\t{grad_norm}')
 
 
 def main():

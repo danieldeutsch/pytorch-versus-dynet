@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -55,6 +56,13 @@ class PyTorchModel(torch.nn.Module):
         scores = scores[:, :-1].view(-1, self.vocab_size)
 
         return self.loss(scores, target_tokens)
+
+
+def print_param_info(model: torch.nn.Module) -> None:
+    for name, param in model.named_parameters():
+        norm = np.linalg.norm(param.detach().numpy())
+        grad_norm = np.linalg.norm(param.grad.numpy())
+        print(f'{name}\t{norm}\t{grad_norm}')
 
 
 def main():
