@@ -21,7 +21,7 @@ class PyTorchModel(torch.nn.Module):
         self.decoder = torch.nn.RNN(input_size=embed_size,
                                     hidden_size=hidden_size,
                                     batch_first=True)
-        self.projection_layer = torch.nn.Linear(hidden_size * 2, hidden_size)
+        self.projection_layer = torch.nn.Linear(hidden_size, hidden_size)
         self.output_layer = torch.nn.Linear(hidden_size, vocab_size)
         self.loss = torch.nn.CrossEntropyLoss(reduction='sum')
 
@@ -45,11 +45,7 @@ class PyTorchModel(torch.nn.Module):
         target_embedding = self.embeddings(target)
         target_encoding, _ = self.decoder(target_embedding, hidden)
 
-        affinities = torch.bmm(target_encoding, source_encoding.permute(0, 2, 1))
-        attention = torch.nn.functional.softmax(affinities, dim=-1)
-        context = torch.bmm(attention, source_encoding)
-
-        projection = self.projection_layer(torch.cat([target_encoding, context], dim=-1))
+        projection = self.projection_layer(target_encoding)
         scores = self.output_layer(projection)
 
         target_tokens = target[:, 1:].view(-1)

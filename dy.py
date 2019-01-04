@@ -23,7 +23,7 @@ class DyNetModel(object):
                                               input_dim=embed_size,
                                               hidden_dim=hidden_size,
                                               model=pc)
-        self.projection_layer_weights = pc.add_parameters((hidden_size, hidden_size * 2), dynet.UniformInitializer(0.1), name='projection.weight')
+        self.projection_layer_weights = pc.add_parameters((hidden_size, hidden_size), dynet.UniformInitializer(0.1), name='projection.weight')
         self.projection_layer_bias = pc.add_parameters((hidden_size), dynet.UniformInitializer(0.1), name='projection.bias')
         self.output_layer_weights = pc.add_parameters((vocab_size, hidden_size), dynet.UniformInitializer(0.1), name='output.weight')
         self.output_layer_bias = pc.add_parameters((vocab_size), dynet.UniformInitializer(0.1), name='output.bias')
@@ -34,12 +34,10 @@ class DyNetModel(object):
             params.set_value(np.random.uniform(-0.1, 0.1, params.shape()))
 
     def calculate_projection(self,
-                             target_encoding: Expression,
-                             context: Expression) -> Expression:
+                             target_encoding: Expression) -> Expression:
         W = dynet.parameter(self.projection_layer_weights)
         b = dynet.parameter(self.projection_layer_bias)
-        concat = dynet.concatenate([target_encoding, dynet.transpose(context)])
-        return dynet.affine_transform([b, W, concat])
+        return dynet.affine_transform([b, W, target_encoding])
 
     def calculate_output_scores(self,
                                 hidden: Expression) -> Expression:
@@ -74,11 +72,7 @@ class DyNetModel(object):
         source_encoding = dynet.concatenate_cols(source_encoding)
         target_encoding = dynet.concatenate_cols(target_encoding)
 
-        affinities = dynet.transpose(target_encoding) * source_encoding
-        attention = dynet.softmax(dynet.transpose(affinities))
-        context = dynet.transpose(source_encoding * attention)
-
-        projection = self.calculate_projection(target_encoding, context)
+        projection = self.calculate_projection(target_encoding)
         scores = self.calculate_output_scores(projection)
 
         target_tokens = target[1:]
