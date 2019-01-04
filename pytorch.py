@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from tqdm import tqdm
-from typing import Tuple
 
 from util import load_data, load_vocab, get_vocab_size
 

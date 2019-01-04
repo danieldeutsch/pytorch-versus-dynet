@@ -14,11 +14,10 @@ class DyNetModel(object):
                  embed_size: int,
                  hidden_size: int) -> None:
         self.embeddings = pc.add_lookup_parameters((vocab_size, embed_size), dynet.UniformInitializer(0.1), name='embedding.weight')
-        self.encoder = dynet.BiRNNBuilder(num_layers=1,
-                                          input_dim=embed_size,
-                                          hidden_dim=hidden_size,
-                                          model=pc,
-                                          rnn_builder_factory=dynet.SimpleRNNBuilder)
+        self.encoder = dynet.SimpleRNNBuilder(layers=1,
+                                              input_dim=embed_size,
+                                              hidden_dim=hidden_size,
+                                              model=pc)
         self.decoder = dynet.SimpleRNNBuilder(layers=1,
                                               input_dim=embed_size,
                                               hidden_dim=hidden_size,
@@ -58,18 +57,12 @@ class DyNetModel(object):
                  source: List[int],
                  target: List[int]) -> Expression:
         source_embedding = [self.embeddings[x] for x in source]
-        source_encoding = self.encoder.add_inputs(source_embedding)
-        hidden = dynet.concatenate([source_encoding[-1][0].s()[0], source_encoding[-1][1].s()[0]])
+        source_encoding = self.encoder.initial_state().transduce(source_embedding)
+        hidden = source_encoding[-1]
 
         target_embedding = [self.embeddings[x] for x in target]
         decoder_state = self.decoder.initial_state().set_s((hidden,))
-        target_encoding = decoder_state.add_inputs(target_embedding)
-
-        source_encoding = [dynet.concatenate([state[0].output(), state[1].output()])
-                           for state in source_encoding]
-        target_encoding = [state.output() for state in target_encoding]
-
-        source_encoding = dynet.concatenate_cols(source_encoding)
+        target_encoding = decoder_state.transduce(target_embedding)
         target_encoding = dynet.concatenate_cols(target_encoding)
 
         projection = self.calculate_projection(target_encoding)
