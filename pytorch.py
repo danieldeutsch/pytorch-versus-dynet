@@ -19,11 +19,20 @@ class PyTorchModel(torch.nn.Module):
         self.decoder = torch.nn.RNN(input_size=embed_size,
                                     hidden_size=hidden_size,
                                     batch_first=True)
-        self.attention_W = torch.nn.Linear(hidden_size * 2, hidden_size)
-        self.attention_v = torch.nn.Linear(hidden_size, 1)
         self.projection_layer = torch.nn.Linear(hidden_size * 2, hidden_size)
         self.output_layer = torch.nn.Linear(hidden_size, vocab_size)
         self.loss = torch.nn.CrossEntropyLoss(reduction='sum')
+
+        torch.nn.init.uniform_(self.embeddings.weight, -0.1, 0.1)
+        torch.nn.init.uniform_(self.projection_layer.weight, -0.1, 0.1)
+        torch.nn.init.uniform_(self.projection_layer.bias, -0.1, 0.1)
+        torch.nn.init.uniform_(self.output_layer.weight, -0.1, 0.1)
+        torch.nn.init.uniform_(self.output_layer.bias, -0.1, 0.1)
+
+        for param in self.encoder.parameters():
+            torch.nn.init.uniform_(param, -0.1, 0.1)
+        for param in self.decoder.parameters():
+            torch.nn.init.uniform_(param, -0.1, 0.1)
 
     def forward(self,
                 source: torch.Tensor,

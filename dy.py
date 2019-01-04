@@ -1,4 +1,5 @@
 import dynet
+import numpy as np
 from dynet import Expression, ParameterCollection, RNNState
 from tqdm import tqdm
 from typing import List, Tuple
@@ -12,7 +13,7 @@ class DyNetModel(object):
                  vocab_size: int,
                  embed_size: int,
                  hidden_size: int) -> None:
-        self.embeddings = pc.add_lookup_parameters((vocab_size, embed_size))
+        self.embeddings = pc.add_lookup_parameters((vocab_size, embed_size), dynet.UniformInitializer(0.1))
         self.encoder = dynet.BiRNNBuilder(num_layers=1,
                                           input_dim=embed_size,
                                           hidden_dim=hidden_size,
@@ -22,10 +23,15 @@ class DyNetModel(object):
                                               input_dim=embed_size,
                                               hidden_dim=hidden_size,
                                               model=pc)
-        self.projection_layer_weights = pc.add_parameters((hidden_size, hidden_size * 2))
-        self.projection_layer_bias = pc.add_parameters((hidden_size))
-        self.output_layer_weights = pc.add_parameters((vocab_size, hidden_size))
-        self.output_layer_bias = pc.add_parameters((vocab_size))
+        self.projection_layer_weights = pc.add_parameters((hidden_size, hidden_size * 2), dynet.UniformInitializer(0.1))
+        self.projection_layer_bias = pc.add_parameters((hidden_size), dynet.UniformInitializer(0.1))
+        self.output_layer_weights = pc.add_parameters((vocab_size, hidden_size), dynet.UniformInitializer(0.1))
+        self.output_layer_bias = pc.add_parameters((vocab_size), dynet.UniformInitializer(0.1))
+
+        for params in self.encoder.param_collection().parameters_list():
+            params.set_value(np.random.uniform(-0.1, 0.1, params.shape()))
+        for params in self.decoder.get_parameters()[0]:
+            params.set_value(np.random.uniform(-0.1, 0.1, params.shape()))
 
     def calculate_projection(self,
                              target_encoding: Expression,
