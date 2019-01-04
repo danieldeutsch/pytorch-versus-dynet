@@ -36,50 +36,14 @@ class PyTorchModel(torch.nn.Module):
         for param in self.decoder.parameters():
             torch.nn.init.uniform_(param, -0.1, 0.1)
 
-        self.encoder_W_ih = torch.nn.Linear(embed_size, hidden_size)
-        self.encoder_W_hh = torch.nn.Linear(hidden_size, hidden_size)
-        self.decoder_W_ih = torch.nn.Linear(embed_size, hidden_size)
-        self.decoder_W_hh = torch.nn.Linear(hidden_size, hidden_size)
-
-    def run_encoder(self, embeddings: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self.run_rnn(self.encoder_W_ih, self.encoder_W_hh, embeddings)
-
-    def run_decoder(self,
-                    embeddings: torch.Tensor,
-                    hidden: torch.Tensor) -> torch.Tensor:
-        output, _ = self.run_rnn(self.decoder_W_ih, self.decoder_W_hh, embeddings, hidden)
-        return output
-
-    def run_rnn(self,
-                W_ih: torch.Tensor,
-                W_hh: torch.Tensor,
-                embeddings: torch.Tensor,
-                hidden: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
-        batch_size, seq_len, _ = embeddings.size()
-        if hidden is None:
-            hidden = torch.zeros(batch_size, self.hidden_size)
-        outputs = [hidden]
-
-        for t in range(seq_len):
-            input_ = embeddings[:, t]
-            hidden = outputs[-1]
-            outputs.append(torch.tanh(W_ih(input_) + W_hh(hidden)))
-
-        output = torch.cat(outputs).unsqueeze(0)
-        hidden = output[:, -1]
-        output = output[:, 1:]
-        return output, hidden
-
     def forward(self,
                 source: torch.Tensor,
                 target: torch.Tensor) -> torch.Tensor:
         source_embedding = self.embeddings(source)
-        source_encoding, hidden = self.run_encoder(source_embedding)
-        # source_encoding, hidden = self.encoder(source_embedding)
+        source_encoding, hidden = self.encoder(source_embedding)
 
         target_embedding = self.embeddings(target)
-        target_encoding = self.run_decoder(target_embedding, hidden)
-        # target_encoding, _ = self.decoder(target_embedding, hidden)
+        target_encoding, _ = self.decoder(target_embedding, hidden)
 
         affinities = torch.bmm(target_encoding, source_encoding.permute(0, 2, 1))
         attention = torch.nn.functional.softmax(affinities, dim=-1)
