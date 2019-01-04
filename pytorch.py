@@ -25,22 +25,6 @@ class PyTorchModel(torch.nn.Module):
         self.output_layer = torch.nn.Linear(hidden_size, vocab_size)
         self.loss = torch.nn.CrossEntropyLoss(reduction='sum')
 
-    def calculate_attention(self,
-                            source_encoding: torch.Tensor,
-                            target_encoding: torch.Tensor) -> torch.Tensor:
-        num_source_tokens = source_encoding.size(1)
-        num_target_tokens = target_encoding.size(1)
-
-        source_encoding = source_encoding.unsqueeze(1)
-        target_encoding = target_encoding.unsqueeze(2)
-
-        source_encoding = source_encoding.expand(-1, num_target_tokens, -1, -1)
-        target_encoding = target_encoding.expand(-1, -1, num_source_tokens, -1)
-
-        concat = torch.cat([source_encoding, target_encoding], dim=-1)
-        affinities = self.attention_v(torch.tanh(self.attention_W(concat))).squeeze(-1)
-        return affinities
-
     def forward(self,
                 source: torch.Tensor,
                 target: torch.Tensor) -> torch.Tensor:
@@ -51,7 +35,7 @@ class PyTorchModel(torch.nn.Module):
         target_embedding = self.embeddings(target)
         target_encoding, _ = self.decoder(target_embedding, hidden)
 
-        affinities = self.calculate_attention(source_encoding, target_encoding)
+        affinities = torch.bmm(target_encoding, source_encoding.permute(0, 2, 1))
         attention = torch.nn.functional.softmax(affinities, dim=-1)
         context = torch.bmm(attention, source_encoding)
 

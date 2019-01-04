@@ -22,60 +22,24 @@ class DyNetModel(object):
                                               input_dim=embed_size,
                                               hidden_dim=hidden_size,
                                               model=pc)
-        self.attention_W_weights = pc.add_parameters((hidden_size, hidden_size * 2))
-        self.attention_W_bias = pc.add_parameters((hidden_size))
-        self.attention_v_weights = pc.add_parameters((hidden_size))
         self.projection_layer_weights = pc.add_parameters((hidden_size, hidden_size * 2))
         self.projection_layer_bias = pc.add_parameters((hidden_size))
         self.output_layer_weights = pc.add_parameters((vocab_size, hidden_size))
         self.output_layer_bias = pc.add_parameters((vocab_size))
 
-    def calculate_attention(self,
-                            source_encoding: List[Expression],
-                            target_encoding: List[Expression]) -> List[Expression]:
-        W = dynet.parameter(self.attention_W_weights)
-        b = dynet.parameter(self.attention_W_bias)
-        v = dynet.parameter(self.attention_v_weights)
-        affinities_matrix = []
-        for target_state in target_encoding:
-            affinities = []
-            for source_state in source_encoding:
-                concat = dynet.concatenate([source_state, target_state])
-                affinity = dynet.transpose(v) * dynet.tanh(dynet.affine_transform([b, W, concat]))
-                affinities.append(affinity)
-            affinities_matrix.append(dynet.concatenate(affinities))
-        return affinities_matrix
-
-    def calculate_context(self,
-                          source_encoding: List[Expression],
-                          affinity_matrix: List[Expression]) -> List[Expression]:
-        contexts = []
-        for affinities in affinity_matrix:
-            attention = dynet.softmax(affinities)
-            context = dynet.esum([dynet.cmult(state, prob) for state, prob in zip(source_encoding, attention)])
-            contexts.append(context)
-        return contexts
-
     def calculate_projection(self,
-                             target_encoding: List[Expression],
-                             contexts: List[Expression]) -> List[Expression]:
+                             target_encoding: Expression,
+                             context: Expression) -> List[Expression]:
         W = dynet.parameter(self.projection_layer_weights)
         b = dynet.parameter(self.projection_layer_bias)
-        projections = []
-        for encoding, context in zip(target_encoding, contexts):
-            projection = dynet.affine_transform([b, W, dynet.concatenate([encoding, context])])
-            projections.append(projection)
-        return projections
+        concat = dynet.concatenate([target_encoding, dynet.transpose(context)])
+        return dynet.affine_transform([b, W, concat])
 
     def calculate_output_scores(self,
-                                hidden: List[Expression]) -> List[Expression]:
+                                hidden: Expression) -> List[Expression]:
         W = dynet.parameter(self.output_layer_weights)
         b = dynet.parameter(self.output_layer_bias)
-        outputs = []
-        for h in hidden:
-            output = dynet.affine_transform([b, W, h])
-            outputs.append(output)
-        return outputs
+        return dynet.transpose(dynet.affine_transform([b, W, hidden]))
 
     def calculate_loss(self,
                        target_tokens: List[int],
@@ -101,8 +65,11 @@ class DyNetModel(object):
                            for state in source_encoding]
         target_encoding = [state.output() for state in target_encoding]
 
-        affinities = self.calculate_attention(source_encoding, target_encoding)
-        context = self.calculate_context(source_encoding, affinities)
+        source_encoding = dynet.concatenate_cols(source_encoding)
+        target_encoding = dynet.concatenate_cols(target_encoding)
+
+        affinities = dynet.transpose(target_encoding) * source_encoding
+        context = affinities * dynet.transpose(source_encoding)
 
         projection = self.calculate_projection(target_encoding, context)
         scores = self.calculate_output_scores(projection)
