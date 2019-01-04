@@ -1,8 +1,8 @@
 import dynet
 import numpy as np
-from dynet import Expression, ParameterCollection, RNNState
+from dynet import Expression, ParameterCollection
 from tqdm import tqdm
-from typing import List, Tuple
+from typing import List
 
 from util import load_data, load_vocab, get_vocab_size
 
@@ -35,21 +35,21 @@ class DyNetModel(object):
 
     def calculate_projection(self,
                              target_encoding: Expression,
-                             context: Expression) -> List[Expression]:
+                             context: Expression) -> Expression:
         W = dynet.parameter(self.projection_layer_weights)
         b = dynet.parameter(self.projection_layer_bias)
         concat = dynet.concatenate([target_encoding, dynet.transpose(context)])
         return dynet.affine_transform([b, W, concat])
 
     def calculate_output_scores(self,
-                                hidden: Expression) -> List[Expression]:
+                                hidden: Expression) -> Expression:
         W = dynet.parameter(self.output_layer_weights)
         b = dynet.parameter(self.output_layer_bias)
         return dynet.transpose(dynet.affine_transform([b, W, hidden]))
 
     def calculate_loss(self,
                        target_tokens: List[int],
-                       scores: List[Expression]) -> Expression:
+                       scores: Expression) -> Expression:
         losses = []
         for score, token in zip(scores, target_tokens):
             log_probs = dynet.log_softmax(score)
